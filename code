@@ -1,0 +1,156 @@
+// Maze Solver Robot Code
+// Implements a right-hand wall-following algorithm.
+// Compatible with the described PCB using an Arduino Nano and TB6612FNG motor driver.
+
+// --- Pin Definitions ---
+
+// Define motor driver pins for TB6612FNG
+// Motor A (e.g., Right Motor)
+const int AIN1 = 7;  // Motor A Direction 1
+const int AIN2 = 8;  // Motor A Direction 2
+const int PWMA = 9;  // Motor A Speed (PWM)
+
+// Motor B (e.g., Left Motor)
+const int BIN1 = 4;  // Motor B Direction 1
+const int BIN2 = 5;  // Motor B Direction 2
+const int PWMB = 6;  // Motor B Speed (PWM)
+
+// Standby pin for TB6612FNG (must be HIGH to enable motors)
+const int STBY = 3;
+
+// Define ultrasonic sensor pins (HC-SR04)
+// These pins can be connected to JP5 or other I/O headers.
+const int rightTrigPin = 10;
+const int rightEchoPin = 11;
+const int frontTrigPin = 12;
+const int frontEchoPin = 13;
+const int leftTrigPin = A0; // Using analog pins as digital I/O
+const int leftEchoPin = A1;
+
+// --- Algorithm Parameters ---
+int motorSpeed = 150;      // Speed of motors (0-255)
+int wallDistance = 15;     // Desired distance from the wall (in cm)
+int frontBlockDistance = 10; // Distance to consider the front as blocked
+
+// --- Main Program ---
+
+void setup() {
+  // Set all motor control pins as outputs
+  pinMode(AIN1, OUTPUT);
+  pinMode(AIN2, OUTPUT);
+  pinMode(PWMA, OUTPUT);
+  pinMode(BIN1, OUTPUT);
+  pinMode(BIN2, OUTPUT);
+  pinMode(PWMB, OUTPUT);
+  pinMode(STBY, OUTPUT);
+
+  // Set sensor pins
+  pinMode(rightTrigPin, OUTPUT);
+  pinMode(rightEchoPin, INPUT);
+  pinMode(frontTrigPin, OUTPUT);
+  pinMode(frontEchoPin, INPUT);
+  pinMode(leftTrigPin, OUTPUT);
+  pinMode(leftEchoPin, INPUT);
+
+  // Start serial communication for debugging
+  Serial.begin(9600);
+  
+  // Enable the motor driver
+  digitalWrite(STBY, HIGH);
+}
+
+void loop() {
+  // 1. Read distances from all sensors
+  long rightDist = readSensor(rightTrigPin, rightEchoPin);
+  long frontDist = readSensor(frontTrigPin, frontEchoPin);
+  long leftDist = readSensor(leftTrigPin, leftEchoPin);
+
+  // Print sensor values for debugging
+  Serial.print("Right: "); Serial.print(rightDist);
+  Serial.print("  Front: "); Serial.print(frontDist);
+  Serial.print("  Left: "); Serial.println(leftDist);
+
+  // 2. Implement the wall-following logic
+  if (rightDist > wallDistance) {
+    // If there's no wall on the right, turn right to find it.
+    Serial.println("Action: Turning Right");
+    turnRight();
+    delay(200); // Give time to complete the turn before next reading
+  }
+  else if (frontDist > frontBlockDistance) {
+    // If the path ahead is clear, move forward.
+    Serial.println("Action: Moving Forward");
+    moveForward();
+  }
+  else {
+    // If the front is blocked, turn left.
+    Serial.println("Action: Turning Left");
+    turnLeft();
+    delay(200); // Give time to complete the turn
+  }
+}
+
+// --- Sensor Function ---
+
+// Function to read distance from an HC-SR04 sensor
+long readSensor(int trigPin, int echoPin) {
+  // Send a 10 microsecond pulse to trigger the sensor
+  digitalWrite(trigPin, LOW);
+  delayMicroseconds(2);
+  digitalWrite(trigPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin, LOW);
+
+  // Read the echo pulse duration
+  long duration = pulseIn(echoPin, HIGH);
+
+  // Calculate the distance in cm (Speed of sound is ~343 m/s or 29.1 us/cm)
+  return duration / 29.1 / 2;
+}
+
+
+// --- Motor Control Functions ---
+
+void moveForward() {
+  // Motor A (Right)
+  digitalWrite(AIN1, HIGH);
+  digitalWrite(AIN2, LOW);
+  analogWrite(PWMA, motorSpeed);
+  // Motor B (Left)
+  digitalWrite(BIN1, HIGH);
+  digitalWrite(BIN2, LOW);
+  analogWrite(PWMB, motorSpeed);
+}
+
+void turnRight() {
+  // Motor A (Right) - Backward
+  digitalWrite(AIN1, LOW);
+  digitalWrite(AIN2, HIGH);
+  analogWrite(PWMA, motorSpeed);
+  // Motor B (Left) - Forward
+  digitalWrite(BIN1, HIGH);
+  digitalWrite(BIN2, LOW);
+  analogWrite(PWMB, motorSpeed);
+}
+
+void turnLeft() {
+  // Motor A (Right) - Forward
+  digitalWrite(AIN1, HIGH);
+  digitalWrite(AIN2, LOW);
+  analogWrite(PWMA, motorSpeed);
+  // Motor B (Left) - Backward
+  digitalWrite(BIN1, LOW);
+  digitalWrite(BIN2, HIGH);
+  analogWrite(PWMB, motorSpeed);
+}
+
+void stopMotors() {
+  // Motor A (Right)
+  digitalWrite(AIN1, LOW);
+  digitalWrite(AIN2, LOW);
+  analogWrite(PWMA, 0);
+  // Motor B (Left)
+  digitalWrite(BIN1, LOW);
+  digitalWrite(BIN2, LOW);
+  analogWrite(PWMB, 0);
+}
